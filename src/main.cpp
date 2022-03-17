@@ -3,9 +3,16 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <ESP8266mDNS.h>
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+
+const char *ssid = "Retransmissor";
+const char *password = "01010101";
 
 #define robo
 //#define controle
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined(robo)
 #include <ArduinoOTA.h>
@@ -186,9 +193,9 @@ void setup()
 void loop()
 {
   ArduinoOTA.handle();
-  if (millis() - last_receive < 500)
+  if (millis() - last_receive < 100)
   {
-    // Arma.write(map(255 - data[0], 0, 255, 0, 180));
+    Arma.write(map(255 - value[0], 0, 255, 0, 180));
     int Y = (128 - value[1]) * 2, X = (128 - value[2]) * 2;
     // if (Y > 20 || Y < 20 || X > 20 || X < 20)
     Motor(Y - X, Y + X);
@@ -216,8 +223,8 @@ void loop()
 unsigned long Ch_time[5];
 byte value[6];
 uint8_t broadcastAddress[6] = {0xCC, 0x50, 0xE3, 0x56, 0xAD, 0xF4}; // CC:50:E3:56:AD:F4
-const char *ssid = "LenHide";
-const char *password = "01010101";
+// const char *ssid = "LenHide";
+// const char *password = "01010101";
 bool send = 0;
 
 void ICACHE_RAM_ATTR CH0();
@@ -285,17 +292,31 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus)
   }
 }
 
+AsyncWebServer server(80);
+
 void setup()
 {
   Serial.begin(115200);
+
+  Serial.println("Booting");
+  Serial.print("Setting AP (Access Point)…");
+  WiFi.softAP(ssid, password);
+  server.begin();
+
+  // Once ESPNow is successfully Init, we will register for Send CB to
+  // get the status of Trasnmitted packet
+  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+  // esp_now_register_send_cb(OnDataSent);
+  //  Register peer
+  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+
   attachInterrupt(digitalPinToInterrupt(12), CH0, CHANGE);
   attachInterrupt(digitalPinToInterrupt(13), CH1, CHANGE);
   attachInterrupt(digitalPinToInterrupt(14), CH2, CHANGE);
   attachInterrupt(digitalPinToInterrupt(4), CH3, CHANGE);
   attachInterrupt(digitalPinToInterrupt(5), CH4, CHANGE);
 
-  Serial.begin(115200);
-  Serial.println("Booting");
+  /*
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   while (WiFi.waitForConnectResult() != WL_CONNECTED)
@@ -309,13 +330,7 @@ void setup()
     Serial.println("Error initializing ESP-NOW");
     return;
   }
-
-  // Once ESPNow is successfully Init, we will register for Send CB to
-  // get the status of Trasnmitted packet
-  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
-  // esp_now_register_send_cb(OnDataSent);
-  //  Register peer
-  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  */
 }
 void loop()
 {
