@@ -9,8 +9,8 @@
 const char *ssid = "Retransmissor";
 const char *password = "01010101";
 
-#define robo
-//#define controle
+//#define robo
+#define controle
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -174,7 +174,7 @@ void ConnectEspNow()
 void setup()
 {
   Serial.begin(115200);
-  SetupOTA("Tecna", "LenHide", "01010101");
+  SetupOTA("Tecna", ssid, password);
   ConnectEspNow();
   pinMode(AI1, OUTPUT);
   pinMode(AI2, OUTPUT);
@@ -193,7 +193,7 @@ void setup()
 void loop()
 {
   ArduinoOTA.handle();
-  if (millis() - last_receive < 100)
+  if (millis() - last_receive < 500)
   {
     Arma.write(map(255 - value[0], 0, 255, 0, 180));
     int Y = (128 - value[1]) * 2, X = (128 - value[2]) * 2;
@@ -303,6 +303,9 @@ void setup()
   WiFi.softAP(ssid, password);
   server.begin();
 
+
+if (esp_now_init() != 0)
+    Serial.println("ESPNow Init Failed");
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
   esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
@@ -332,6 +335,7 @@ void setup()
   }
   */
 }
+
 void loop()
 {
   if (send)
