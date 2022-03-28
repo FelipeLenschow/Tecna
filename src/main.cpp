@@ -9,8 +9,8 @@
 const char *ssid = "Retransmissor";
 const char *password = "01010101";
 
-//#define robo
-#define controle
+#define robo
+//#define controle
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ const char *password = "01010101";
 #include <ArduinoOTA.h>
 #include <Servo.h>
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
 #define debugln(x) Serial.println(x)
@@ -36,78 +36,6 @@ uint8_t value[6];
 unsigned long last_receive;
 
 Servo Arma;
-
-void SetupOTA(const char *nameprefix, const char *ssid, const char *password)
-{
-  // Configure the hostname
-  uint16_t maxlen = strlen(nameprefix) + 7;
-  char *fullhostname = new char[maxlen];
-  uint8_t mac[6];
-  WiFi.macAddress(mac);
-  snprintf(fullhostname, maxlen, "%s-%02x%02x%02x", nameprefix, mac[3], mac[4], mac[5]);
-  ArduinoOTA.setHostname(nameprefix);
-  delete[] fullhostname;
-
-  // Configure and start the WiFi station
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-
-  // Wait for connection
-  while (WiFi.waitForConnectResult() != WL_CONNECTED)
-  {
-    debugln("Connection Failed! Rebooting...");
-    delay(5000);
-    ESP.restart();
-  }
-
-  // Port defaults to 3232
-  // ArduinoOTA.setPort(3232); // Use 8266 port if you are working in Sloeber IDE, it is fixed there and not adjustable
-
-  // No authentication by default
-  ArduinoOTA.setPassword("0101");
-
-  // Password can be set with it's md5 value as well
-  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
-
-  ArduinoOTA.onStart([]()
-                     {
-                       //NOTE: make .detach() here for all functions called by Ticker.h library - not to interrupt transfer process in any way.
-                       String type;
-                       if (ArduinoOTA.getCommand() == U_FLASH)
-                         type = "sketch";
-                       else // U_SPIFFS
-                         type = "filesystem";
-
-                       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-                       debugln("Start updating " + type); });
-
-  ArduinoOTA.onEnd([]()
-                   { debugln("\nEnd"); });
-
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
-                        { Serial.printf("Progress: %u%%\r", (progress / (total / 100))); });
-
-  ArduinoOTA.onError([](ota_error_t error)
-                     {
-                       Serial.printf("Error[%u]: ", error);
-                       if (error == OTA_AUTH_ERROR)
-                         debugln("\nAuth Failed");
-                       else if (error == OTA_BEGIN_ERROR)
-                         debugln("\nBegin Failed");
-                       else if (error == OTA_CONNECT_ERROR)
-                         debugln("\nConnect Failed");
-                       else if (error == OTA_RECEIVE_ERROR)
-                         debugln("\nReceive Failed");
-                       else if (error == OTA_END_ERROR)
-                         debugln("\nEnd Failed"); });
-
-  ArduinoOTA.begin();
-
-  debugln("OTA Initialized");
-  debug("IP address: ");
-  debugln(WiFi.localIP());
-}
 
 void Motor(signed int velocidade1, signed int velocidade2)
 {
@@ -150,7 +78,87 @@ void Motor(signed int velocidade1, signed int velocidade2)
     }
   }
 }
+void WifiDisconnect()
+{
+  if (WiFi.waitForConnectResult() == WL_CONNECTED)
+  {
+    WiFi.disconnect();
+    WiFi.mode(WIFI_OFF);
+    // esp_wifi_stop()
+  }
+}
+void WifiConnect()
+{
+  // Configure and start the WiFi station
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
 
+  // Wait for connection
+  while (WiFi.waitForConnectResult() != WL_CONNECTED)
+  {
+    debugln("Connection Failed! Rebooting...");
+    // delay(5000);
+    ESP.restart();
+  }
+}
+void SetupOTA(const char *nameprefix)
+{
+  // Configure the hostname
+  uint16_t maxlen = strlen(nameprefix) + 7;
+  char *fullhostname = new char[maxlen];
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  snprintf(fullhostname, maxlen, "%s-%02x%02x%02x", nameprefix, mac[3], mac[4], mac[5]);
+  ArduinoOTA.setHostname(nameprefix);
+  delete[] fullhostname;
+
+  // Port defaults to 3232
+  // ArduinoOTA.setPort(3232); // Use 8266 port if you are working in Sloeber IDE, it is fixed there and not adjustable
+
+  // No authentication by default
+  ArduinoOTA.setPassword("0101");
+
+  // Password can be set with it's md5 value as well
+  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
+  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
+
+  ArduinoOTA.onStart([]()
+                     {
+                        Arma.write(0);
+                        Motor(0, 0);
+                       //NOTE: make .detach() here for all functions called by Ticker.h library - not to interrupt transfer process in any way.
+                       String type;
+                       if (ArduinoOTA.getCommand() == U_FLASH)
+                         type = "sketch";
+                       else // U_SPIFFS
+                         type = "filesystem";
+
+                       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+                       debugln("Start updating " + type); });
+  ArduinoOTA.onEnd([]()
+                   { debugln("\nEnd"); });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+                        { Serial.printf("Progress: %u%%\r", (progress / (total / 100))); });
+  ArduinoOTA.onError([](ota_error_t error)
+                     {
+                       Serial.printf("Error[%u]: ", error);
+                       if (error == OTA_AUTH_ERROR)
+                         debugln("\nAuth Failed");
+                       else if (error == OTA_BEGIN_ERROR)
+                         debugln("\nBegin Failed");
+                       else if (error == OTA_CONNECT_ERROR)
+                         debugln("\nConnect Failed");
+                       else if (error == OTA_RECEIVE_ERROR)
+                         debugln("\nReceive Failed");
+                       else if (error == OTA_END_ERROR)
+                         debugln("\nEnd Failed"); });
+
+  ArduinoOTA.begin();
+
+  debugln("OTA Initialized");
+  debug("IP address: ");
+  debugln(WiFi.localIP());
+}
 uint8_t broadcastAddress[6] = {0xC3, 0x5B, 0xBE, 0x60, 0xB6, 0x63};
 void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len)
 {
@@ -158,24 +166,30 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len)
   for (int i = 0; i < 6; i++)
   {
     value[i] = data[i];
-    debug(data[0]);
+    debug(data[i]);
     debug("  ");
   }
   debugln();
 }
-
 void ConnectEspNow()
 {
   if (esp_now_init() != 0)
     debugln("ESPNow Init Failed");
   esp_now_register_recv_cb(OnDataRecv);
+  debugln("nowReady");
 }
 
 void setup()
 {
   Serial.begin(115200);
-  SetupOTA("Tecna", ssid, password);
+  WiFi.mode(WIFI_STA);
+
+  // Serial.println("Ota");
+  // SetupOTA("Tecna", ssid, password);
+  Serial.println("Now");
   ConnectEspNow();
+  Serial.println("Done");
+
   pinMode(AI1, OUTPUT);
   pinMode(AI2, OUTPUT);
   pinMode(BI1, OUTPUT);
@@ -193,30 +207,31 @@ void setup()
 void loop()
 {
   ArduinoOTA.handle();
-  if (millis() - last_receive < 500)
+
+  if (millis() - last_receive < 200)
   {
+    digitalWrite(2, LOW);
+    if (WiFi.waitForConnectResult() == WL_CONNECTED)
+      WifiDisconnect();
     Arma.write(map(255 - value[0], 0, 255, 0, 180));
     int Y = (128 - value[1]) * 2, X = (128 - value[2]) * 2;
-    // if (Y > 20 || Y < 20 || X > 20 || X < 20)
     Motor(Y - X, Y + X);
   }
   else
   {
+    digitalWrite(2, HIGH);
+    if (WiFi.waitForConnectResult() == WL_DISCONNECTED)
+    {
+      // WiFi.begin(ssid, password);
+      WifiConnect();
+      SetupOTA("Tecna");
+      digitalWrite(2, LOW);
+      delay(100);
+      digitalWrite(2, HIGH);
+    }
     Arma.write(0);
     Motor(0, 0);
   }
-
-  /*ArduinoOTA.handle();
-  Arma.write(180);
-  // analogWrite(W_pwm, 255);
-  //  Motor(-255,-255);
-  delay(2000);
-  ArduinoOTA.handle();
-  // analogWrite(W_pwm, 0);
-  Arma.write(0);
-  Motor(0, 0);
-  delay(1000);
-  */
 }
 #elif defined(controle)
 
@@ -303,8 +318,7 @@ void setup()
   WiFi.softAP(ssid, password);
   server.begin();
 
-
-if (esp_now_init() != 0)
+  if (esp_now_init() != 0)
     Serial.println("ESPNow Init Failed");
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
