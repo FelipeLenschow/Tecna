@@ -6,8 +6,8 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-const char *ssid = "Retransmissor";
-const char *password = "01010101";
+const char *ssid = "Retransmissor"; // Nome da Rede
+const char *password = "01010101";  // Senha da Rede
 
 #define robo
 //#define controle
@@ -33,7 +33,7 @@ const char *password = "01010101";
 #define BI2 16
 #define W_pwm 5
 uint8_t value[6];
-unsigned long last_receive;
+unsigned long last_receive = 0;
 
 Servo Arma;
 
@@ -80,26 +80,23 @@ void Motor(signed int velocidade1, signed int velocidade2)
 }
 void WifiDisconnect()
 {
-  if (WiFi.waitForConnectResult() == WL_CONNECTED)
+  if (WiFi.waitForConnectResult(500) == WL_CONNECTED)
   {
     WiFi.disconnect();
-    WiFi.mode(WIFI_OFF);
+    WiFi.mode(WIFI_STA);
     // esp_wifi_stop()
   }
 }
 void WifiConnect()
 {
-  // Configure and start the WiFi station
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-
-  // Wait for connection
-  while (WiFi.waitForConnectResult() != WL_CONNECTED)
+  do
   {
-    debugln("Connection Failed! Rebooting...");
-    // delay(5000);
-    ESP.restart();
+    // Configure and start the WiFi station
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
   }
+  // Wait for connection
+  while (WiFi.waitForConnectResult() != WL_CONNECTED);
 }
 void SetupOTA(const char *nameprefix)
 {
@@ -183,13 +180,7 @@ void setup()
 {
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
-
-  // Serial.println("Ota");
-  // SetupOTA("Tecna", ssid, password);
-  Serial.println("Now");
   ConnectEspNow();
-  Serial.println("Done");
-
   pinMode(AI1, OUTPUT);
   pinMode(AI2, OUTPUT);
   pinMode(BI1, OUTPUT);
@@ -206,9 +197,7 @@ void setup()
 
 void loop()
 {
-  ArduinoOTA.handle();
-
-  if (millis() - last_receive < 200)
+  if (millis() - last_receive < 200) // FAIL SAFE
   {
     digitalWrite(2, LOW);
     if (WiFi.waitForConnectResult() == WL_CONNECTED)
@@ -219,18 +208,21 @@ void loop()
   }
   else
   {
+    Arma.write(0);
+    Motor(0, 0);
     digitalWrite(2, HIGH);
-    if (WiFi.waitForConnectResult() == WL_DISCONNECTED)
+    if (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
-      // WiFi.begin(ssid, password);
+      // Serial.println("Wifi");
+      //  WiFi.begin(ssid, password);
       WifiConnect();
       SetupOTA("Tecna");
+
       digitalWrite(2, LOW);
       delay(100);
       digitalWrite(2, HIGH);
     }
-    Arma.write(0);
-    Motor(0, 0);
+    ArduinoOTA.handle();
   }
 }
 #elif defined(controle)
